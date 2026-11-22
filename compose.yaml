@@ -1,0 +1,144 @@
+# Local development stack.
+#
+#   cp .env.example .env
+#   docker compose up --build              # web, worker, beat, db, redis, mailpit
+#   docker compose --profile replica up    # + a streaming PostgreSQL read replica
+#
+# Open http://localhost:8000 (public site) and http://<tenant>.localhost:8000.
+# Full walkthrough: docs/04-docker.md
+
+x-app-env: &app-env
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-insecure-dev-key-change-me}
+  DATABASE_URL: postgres://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@db:5432/${POSTGRES_DB:-app}
+  DATABASE_REPLICA_URLS: ${DATABASE_REPLICA_URLS:-}
+  DATABASE_EXTRA_URLS: ${DATABASE_EXTRA_URLS:-analytics=postgres://app:app@db:5432/analytics}
+  DATABASE_APP_ROUTES: ${DATABASE_APP_ROUTES:-analytics=analytics}
+  REDIS_URL: redis://redis:6379/0
+  EMAIL_HOST: mailpit
+  EMAIL_PORT: "1025"
+
+x-app: &app
+  build:
+    context: .
+    target: development
+    args:
+      APP_UID: ${APP_UID:-1000}
+      APP_GID: ${APP_GID:-1000}
+  image: django-multi-tenant:dev
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    <<: *app-env
+  volumes:
+    - .:/app            # live code reload
+    - media:/app/media
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  init: true
+  restart: unless-stopped
+
+services:
+  web:
+    <<: *app
+    environment:
+      <<: *app-env
+      RUN_MIGRATIONS: "1"   # only the web service migrates
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live/', timeout=4)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  worker:
+    <<: *app
+    command: celery -A config worker --loglevel=INFO --concurrency=2
+    depends_on:
+      web:
+        condition: service_healthy   # wait until migrations are done
+
+  beat:
+    <<: *app
+    # TenantAwarePersistentScheduler runs each periodic task once per tenant.
+    command: >
+      celery -A config beat --loglevel=INFO
+      --scheduler tenant_schemas_celery.scheduler.TenantAwarePersistentScheduler
+      --schedule /tmp/celerybeat-schedule
+    depends_on:
+      web:
+        condition: service_healthy
+
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
+      POSTGRES_EXTRA_DATABASES: analytics
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:-replicator}
+    volumes:
+      # PostgreSQL 18+ images keep data under /var/lib/postgresql/<major>/docker
+      - pgdata:/var/lib/postgresql
+      - ./docker/postgres/initdb:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  db-replica:
+    image: postgres:18-alpine
+    profiles: ["replica"]
+    user: postgres
+    entrypoint: ["/replica-entrypoint.sh"]
+    environment:
+      PRIMARY_HOST: db
+      PGDATA: /var/lib/postgresql/18/docker
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:-replicator}
+    volumes:
+      - pgdata-replica:/var/lib/postgresql
+      - ./docker/postgres/replica-entrypoint.sh:/replica-entrypoint.sh:ro
+    ports:
+      - "${POSTGRES_REPLICA_PORT:-5433}:5432"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -q"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:8-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "${MAILPIT_PORT:-8025}:8025"   # web UI; SMTP listens on 1025 inside the network
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  pgdata-replica:
+  redisdata:
+  media:

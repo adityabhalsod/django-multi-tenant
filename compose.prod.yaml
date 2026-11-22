@@ -1,0 +1,118 @@
+# Production-like stack: immutable image, gunicorn, nginx in front.
+#
+#   cp .env.example .env.prod   # then set real secrets and domains
+#   docker compose -f compose.prod.yaml --env-file .env.prod up -d --build
+#
+# In real production you will usually use managed PostgreSQL/Redis and run
+# the same image on Kubernetes/ECS/Fly/etc. See docs/11-deployment.md.
+
+x-app-env: &app-env
+  DJANGO_SETTINGS_MODULE: config.settings.production
+  DATABASE_URL: postgres://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-app}
+  REDIS_URL: redis://redis:6379/0
+
+x-app: &app
+  build:
+    context: .
+    target: production
+  image: ${IMAGE:-django-multi-tenant:latest}
+  env_file:
+    - path: .env.prod
+      required: true
+  environment:
+    <<: *app-env
+  volumes:
+    - media:/app/media
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  init: true
+  restart: unless-stopped
+
+services:
+  migrate:
+    <<: *app
+    # One-off job: migrations + public tenant, then exits.
+    environment:
+      <<: *app-env
+      RUN_MIGRATIONS: "1"
+    command: ["true"]
+    healthcheck:
+      disable: true
+    restart: "no"
+
+  web:
+    <<: *app
+    expose:
+      - "8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    <<: *app
+    command: celery -A config worker --loglevel=INFO
+    healthcheck:
+      disable: true
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  beat:
+    <<: *app
+    command: >
+      celery -A config beat --loglevel=INFO
+      --scheduler tenant_schemas_celery.scheduler.TenantAwarePersistentScheduler
+      --schedule /tmp/celerybeat-schedule
+    healthcheck:
+      disable: true
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  nginx:
+    image: nginx:1.29-alpine
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - media:/srv/media:ro
+    depends_on:
+      - web
+    restart: unless-stopped
+
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_EXTRA_DATABASES: ${POSTGRES_EXTRA_DATABASES:-analytics}
+    volumes:
+      - pgdata:/var/lib/postgresql
+      - ./docker/postgres/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:8-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  media:
