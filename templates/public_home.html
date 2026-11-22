@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Django Multi-Tenant</h1>
+<p class="muted">You are on the <strong>public</strong> site (schema <code>public</code>).</p>
+<ul>
+  <li><a href="/admin/">Platform admin</a>: manage tenants and domains.</li>
+  <li><a href="/health/ready/">Readiness check</a></li>
+</ul>
+{% if domains %}
+<h2>Tenants (shown because DEBUG is on)</h2>
+<ul>
+  {% for d in domains %}<li><a href="http://{{ d.domain }}:{{ port }}/">{{ d.tenant.name }}</a> <code>{{ d.domain }}</code></li>{% endfor %}
+</ul>
+{% else %}
+<p>No tenants yet. Create one with <code>make tenant NAME=Acme</code>.</p>
+{% endif %}
+{% endblock %}

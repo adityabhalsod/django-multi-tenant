@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}{{ tenant.name }}{% endblock %}
+{% block content %}
+<h1>{{ tenant.name }}</h1>
+<p class="muted">Tenant workspace, schema <code>{{ tenant.schema_name }}</code>.</p>
+<ul>
+  <li><a href="/admin/">Tenant admin</a>: users and projects of this tenant only.</li>
+  <li><a href="/api/docs/">API docs</a> (Swagger UI)</li>
+  <li><a href="/api/projects/">Projects API</a></li>
+</ul>
+{% endblock %}
