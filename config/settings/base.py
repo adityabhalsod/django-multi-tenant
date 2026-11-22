@@ -45,12 +45,13 @@ SHARED_APPS = [
     "django.contrib.auth",
     "django.contrib.sessions",
     "django.contrib.messages",
-    "django.contrib.admin",
+    "apps.core.admin_site.TenantAdminConfig",  # django.contrib.admin, branded per schema
     "django.contrib.staticfiles",
     "apps.users",  # platform staff accounts (public.users_user)
     # Third-party apps without models can be listed in either list:
     "rest_framework",
     "drf_spectacular",
+    "drf_spectacular_sidecar",  # self-hosted Swagger UI assets (no CDN)
     "corsheaders",
 ]
 
@@ -60,7 +61,7 @@ TENANT_APPS = [
     "django.contrib.auth",
     "django.contrib.sessions",
     "django.contrib.messages",
-    "django.contrib.admin",
+    "apps.core.admin_site.TenantAdminConfig",
     "apps.users",  # tenant's own users (<schema>.users_user)
     "rest_framework.authtoken",
     "apps.projects",  # example business app, copy this pattern
@@ -196,6 +197,9 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Tenant-scoped API. The tenant is selected by the request hostname.",
     "VERSION": "0.1.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    "SWAGGER_UI_DIST": "SIDECAR",
+    "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
+    "REDOC_DIST": "SIDECAR",
 }
 
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])

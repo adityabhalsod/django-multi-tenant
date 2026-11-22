@@ -11,7 +11,8 @@ x-app-env: &app-env
   DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-insecure-dev-key-change-me}
   DATABASE_URL: postgres://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@db:5432/${POSTGRES_DB:-app}
   DATABASE_REPLICA_URLS: ${DATABASE_REPLICA_URLS:-}
-  DATABASE_EXTRA_URLS: ${DATABASE_EXTRA_URLS:-analytics=postgres://app:app@db:5432/analytics}
+  # Hosts here are compose service names; .env's localhost URLs are for running without Docker.
+  DATABASE_EXTRA_URLS: analytics=postgres://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@db:5432/analytics
   DATABASE_APP_ROUTES: ${DATABASE_APP_ROUTES:-analytics=analytics}
   REDIS_URL: redis://redis:6379/0
   EMAIL_HOST: mailpit

@@ -53,7 +53,7 @@ tenant: ## Create a tenant: make tenant NAME="Acme" EMAIL=admin@acme.test PASSWO
 	$(RUN) python manage.py provision_tenant --name "$(NAME)" --admin-email "$(EMAIL)" --admin-password "$(PASSWORD)"
 
 tenants: ## List tenants and their domains
-	$(RUN) python manage.py shell -c "from apps.tenants.models import Domain; [print(f'{d.tenant.schema_name:20} http://{d.domain}:8000') for d in Domain.objects.select_related('tenant')]"
+	$(RUN) python manage.py shell -v 0 -c "from apps.tenants.models import Domain; [print(f'{d.tenant.schema_name:20} http://{d.domain}:8000') for d in Domain.objects.select_related('tenant')]"
 
 superuser: ## Create a platform (public schema) superuser
 	$(RUN) python manage.py create_tenant_superuser --schema=public

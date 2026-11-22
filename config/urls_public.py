@@ -10,8 +10,6 @@ from django.urls import include, path
 
 from apps.core import views as core_views
 
-admin.site.site_header = "Platform administration"
-
 urlpatterns = [
     path("", core_views.public_home, name="public-home"),
     path("admin/", admin.site.urls),
