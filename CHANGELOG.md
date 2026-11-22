@@ -4,6 +4,17 @@ All notable changes are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Demo GIFs in the README (setup walkthrough and app tour).
+
+### Fixed
+- Compose: the extra `analytics` database URL no longer picks up the `localhost` URL from `.env`, which broke `docker compose up` after `cp .env.example .env`.
+- Swagger UI assets are self-hosted (drf-spectacular-sidecar) instead of loaded from a CDN.
+- The admin header shows the tenant's name in tenant admins instead of "Platform administration".
+- CI: `astral-sh/setup-uv` pinned to an existing release tag.
+
 ## [0.1.0] - 2026-11-22
 
 ### Added

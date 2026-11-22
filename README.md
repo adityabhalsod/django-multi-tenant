@@ -13,7 +13,7 @@ per-app databases, tenant-aware Celery, Docker Compose and uv. Fully documented,
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-[Quick start](#-quick-start) · [Features](#-features) · [How it works](#-how-it-works) · [Documentation](docs/README.md) · [Contributing](CONTRIBUTING.md)
+[Demo](#-demo) · [Quick start](#-quick-start) · [Features](#-features) · [How it works](#-how-it-works) · [Documentation](docs/README.md) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -29,6 +29,17 @@ http://localhost:8000          ->  public schema   (landing page, platform admin
 http://acme.localhost:8000     ->  "acme" schema   (Acme's users, data, admin, API)
 http://globex.localhost:8000   ->  "globex" schema (Globex's users, data, admin, API)
 ```
+
+## 🎬 Demo
+
+**From `git clone` to two isolated tenants in a few commands** (real output from the Docker stack):
+
+![Setup walkthrough: docker compose up, create tenants, use the API, isolation check](docs/assets/setup.gif)
+
+**A tour of what you get:** public site, platform admin, a tenant's own admin, the REST API,
+Swagger UI, and proof that one tenant cannot see another's data:
+
+![App tour: public site, platform admin, tenant admin, API, Swagger UI, isolation](docs/assets/tour.gif)
 
 ## ✨ Features
 
